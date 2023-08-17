@@ -98,7 +98,7 @@ def split_data(msg: str, expected_fields: int) -> List[str] | None:
 
 def join_data(msg_fields: List[str]) -> str:
     """
-    Helper method. Gets a list, joins all of it's fields to one string divided by the data delimiter.
+    Helper method. Gets a list, joins all of its fields to one string divided by the data delimiter.
     Returns: string that looks like cell1#cell2#cell3
     """
     return DATA_DELIMITER.join(msg_fields)
