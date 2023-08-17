@@ -84,9 +84,9 @@ def login(conn: socket.socket) -> None:
     """
     while True:
         # get user and password from user
-        username = input("Please enter username: ")
-        password = input("Please enter password: ")
-
+        # username = input("Please enter username: ")
+        # password = input("Please enter password: ")
+        username = password = "test"
         # build data in the right format
         data = chatlib.join_data([username, password])
 
@@ -138,6 +138,67 @@ def get_high_score(conn: socket.socket) -> None:
         error_and_exit("Error getting high score")
 
 
+def play_question(conn: socket.socket) -> None:
+    """
+    Gets new question from the server,and print it to the user.
+    Then get the user answer, and send it to the server.
+    If the answer is correct, the server send CORRECT_ANSWER.
+    If the answer is wrong, the server send WRONG_ANSWER.
+    We print the response to the user.
+
+    If the server send NO_QUESTIONS, the game is end.
+    If error occurred, the program will close.
+
+    TODO: split the function to smaller functions
+    :param conn:
+    :return:
+    """
+
+    # get question from server
+    cmd, data = build_send_recv_parse(conn, chatlib.PROTOCOL_CLIENT["get_question"], "")
+
+    # check if the game is ended
+    if cmd == chatlib.PROTOCOL_SERVER["no_questions"]:
+        print("No more questions to you")
+        return
+    # check if the server send the question
+    elif cmd == chatlib.PROTOCOL_SERVER["get_question"]:
+        # split the data to question and answers
+        split_data = chatlib.split_data(data, 6)
+
+        # check if the data is valid
+        if split_data is None:
+            error_and_exit("Error play question - number of field is not 6")
+
+        # gets question ID and question
+        q_id = split_data[0]
+        q = split_data[1]
+
+        # print the question and answers
+        print(f"Q: {q}\n\t1. {split_data[2]}\n\t2. {split_data[3]}\n\t3. {split_data[4]}\n\t4. {split_data[5]}")
+
+        # get user answer and check if it valid
+        user_ans = input("\nYou answer is [1-4]: ")
+
+        if not user_ans.isdigit() or int(user_ans) < 1 or int(user_ans) > 4:
+            printer.print_error("Invalid Input")
+
+        # send answer to server and get response
+        cmd, data = build_send_recv_parse(conn, chatlib.PROTOCOL_CLIENT["send_answer"],
+                                          chatlib.join_data([q_id, user_ans]))
+
+        # check if the answer is correct or not, and print the response
+        if cmd == chatlib.PROTOCOL_SERVER["correct_answer"]:
+            printer.print_ok("Correct")
+        elif cmd == chatlib.PROTOCOL_SERVER["wrong_answer"]:
+            printer.print_with_color(f"Wrong! the correct answer is: {data}", printer.PURPLE)
+        else:
+            error_and_exit("Error play question - get response on the answer")
+    # if the server send wrong response
+    else:
+        error_and_exit("Error play question - get wrong response")
+
+
 def main():
     """
     Main method.
@@ -148,10 +209,14 @@ def main():
     user_input = ""
     while user_input != "q":
         user_input = input("Please choose one of the following options:\n"
+                           "p\t Play a trivia question\n"
                            "s\t Get my score\n"
                            "h\t Get the high score\n"
                            "q\t Quit\n")
-        if user_input == "s":
+
+        if user_input == "p":
+            play_question(conn)
+        elif user_input == "s":
             get_score(conn)
         elif user_input == "h":
             get_high_score(conn)

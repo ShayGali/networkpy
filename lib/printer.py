@@ -20,6 +20,15 @@ def print_with_color(msg: any = "", color: str = DEFAULT_COLOR) -> None:
     print(color + str(msg) + DEFAULT_COLOR)
 
 
+def print_ok(msg: any = "") -> None:
+    """
+    Prints an ok message in green.
+    Parameters: msg (str)
+    Returns: Nothing
+    """
+    print_with_color(msg, GREEN)
+
+
 def print_error(msg: any = "") -> None:
     """
     Prints an error message in red.

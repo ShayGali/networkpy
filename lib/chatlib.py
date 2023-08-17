@@ -17,19 +17,20 @@ PROTOCOL_CLIENT = {
     "logout_msg": "LOGOUT",
     "get_score_msg": "MY_SCORE",
     "get_high_score_msg": "HIGHSCORE",
-}  # . Add more commands if needed
+    "get_question": "GET_QUESTION",
+    "send_answer": "SEND_ANSWER"
+}
 
 PROTOCOL_SERVER = {
     "login_ok_msg": "LOGIN_OK",
     "login_failed_msg": "ERROR",
     "your_score_msg": "YOUR_SCORE",
     "get_high_score_msg": "ALL_SCORE",
-}  # .  Add more commands if needed
-
-
-# Other constants
-
-# ERROR_RETURN = None  # What is returned in case of an error
+    "get_question": "YOUR_QUESTION",
+    "no_questions": "NO_QUESTIONS",
+    "correct_answer": "CORRECT_ANSWER",
+    "wrong_answer": "WRONG_ANSWER",
+}
 
 
 def build_message(cmd: str, data: str) -> Union[str, None]:
