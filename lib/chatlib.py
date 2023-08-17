@@ -1,5 +1,5 @@
 # Protocol Constants
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 CMD_FIELD_LENGTH = 16  # Exact length of cmd field (in bytes)
 LENGTH_FIELD_LENGTH = 4  # Exact length of length field (in bytes)
@@ -14,13 +14,17 @@ DATA_DELIMITER = "#"  # Delimiter in the data part of the message
 
 PROTOCOL_CLIENT = {
     "login_msg": "LOGIN",
-    "logout_msg": "LOGOUT"
-}  # .. Add more commands if needed
+    "logout_msg": "LOGOUT",
+    "get_score_msg": "MY_SCORE",
+    "get_high_score_msg": "HIGHSCORE",
+}  # . Add more commands if needed
 
 PROTOCOL_SERVER = {
     "login_ok_msg": "LOGIN_OK",
-    "login_failed_msg": "ERROR"
-}  # ..  Add more commands if needed
+    "login_failed_msg": "ERROR",
+    "your_score_msg": "YOUR_SCORE",
+    "get_high_score_msg": "ALL_SCORE",
+}  # .  Add more commands if needed
 
 
 # Other constants
@@ -28,10 +32,10 @@ PROTOCOL_SERVER = {
 # ERROR_RETURN = None  # What is returned in case of an error
 
 
-def build_message(cmd: str, data: str) -> str | None:
+def build_message(cmd: str, data: str) -> Union[str, None]:
     """
     Gets command name (str) and data field (str) and creates a valid protocol message
-    Returns: str, or None if error occured
+    Returns: str, or None if error occurred
     """
     if cmd not in PROTOCOL_SERVER.values() and cmd not in PROTOCOL_CLIENT.values():
         return None
@@ -45,10 +49,10 @@ def build_message(cmd: str, data: str) -> str | None:
     return f'{cmd_part}|{data_len_part}|{data}'
 
 
-def parse_message(data: str) -> Tuple[str, str] | Tuple[None, None]:
+def parse_message(data: str) -> Union[Tuple[str, str], Tuple[None, None]]:
     """
     Parses protocol message and returns command name and data field
-    Returns: cmd (str), data (str). If some error occured, returns None, None
+    Returns: cmd (str), data (str). If some error occurred, returns None, None
     """
     if data is None or len(data) > MAX_MSG_LENGTH:
         return None, None
@@ -82,11 +86,11 @@ def parse_message(data: str) -> Tuple[str, str] | Tuple[None, None]:
     return cleaned_cmd, data
 
 
-def split_data(msg: str, expected_fields: int) -> List[str] | None:
+def split_data(msg: str, expected_fields: int) -> Union[List[str], None]:
     """
     Helper method. gets a string and number of expected fields in it. Splits the string
     using protocol's data field delimiter (|#) and validates that there are correct number of fields.
-    Returns: list of fields if all ok. If some error occured, returns None
+    Returns: list of fields if all ok. If some error occurred, returns None
     """
 
     if msg is None or msg.count(DATA_DELIMITER) != expected_fields - 1:
