@@ -41,7 +41,7 @@ def recv_message_and_parse(conn: socket.socket) -> Tuple[str, str]:
     then parses the message using chatlib.
     Parameters: conn (socket object)
     Returns: cmd (str) and data (str) of the received message.
-    If error occurred, will return None, None
+    If error occurred, will exit the program.
     """
     res = conn.recv(1024).decode()
     printer.print_debug(f"[DEBUG]: got message: {res}")
