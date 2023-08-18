@@ -214,6 +214,11 @@ def play_question(conn: socket.socket) -> None:
 
 
 def get_logged_users(conn: socket.socket) -> None:
+    """
+    Gets logged users from server.
+    :param conn:
+    :return:
+    """
     cmd, data = build_send_recv_parse(conn, chatlib.PROTOCOL_CLIENT["get_login_players"], "")
 
     if cmd == chatlib.PROTOCOL_SERVER["get_login_players_msg"]:
