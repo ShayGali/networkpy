@@ -138,13 +138,37 @@ def get_high_score(conn: socket.socket) -> None:
         error_and_exit("Error getting high score")
 
 
+def get_answer(conn: socket.socket, q_id: str) -> None:
+    """
+    Gets answer from user, and send it to server.
+    Then, print the response from the server.
+    :param conn:
+    :param q_id: the question ID
+    :return:
+    """
+    # get user answer and check if it valid
+    user_ans = input("\nYou answer is [1-4]: ")
+
+    if not user_ans.isdigit() or int(user_ans) < 1 or int(user_ans) > 4:
+        printer.print_error("Invalid Input")
+
+    # send answer to server and get response
+    cmd, data = build_send_recv_parse(conn, chatlib.PROTOCOL_CLIENT["send_answer"],
+                                      chatlib.join_data([q_id, user_ans]))
+
+    # check if the answer is correct or not, and print the response
+    if cmd == chatlib.PROTOCOL_SERVER["correct_answer"]:
+        printer.print_ok("Correct")
+    elif cmd == chatlib.PROTOCOL_SERVER["wrong_answer"]:
+        printer.print_with_color(f"Wrong! the correct answer is: {data}", printer.PURPLE)
+    else:
+        error_and_exit("Error play question - get response on the answer")
+
+
 def play_question(conn: socket.socket) -> None:
     """
     Gets new question from the server,and print it to the user.
-    Then get the user answer, and send it to the server.
-    If the answer is correct, the server send CORRECT_ANSWER.
-    If the answer is wrong, the server send WRONG_ANSWER.
-    We print the response to the user.
+    Then get the user answer.
 
     If the server send NO_QUESTIONS, the game is end.
     If error occurred, the program will close.
@@ -177,27 +201,13 @@ def play_question(conn: socket.socket) -> None:
         # print the question and answers
         print(f"Q: {q}\n\t1. {split_data[2]}\n\t2. {split_data[3]}\n\t3. {split_data[4]}\n\t4. {split_data[5]}")
 
-        # get user answer and check if it valid
-        user_ans = input("\nYou answer is [1-4]: ")
-
-        if not user_ans.isdigit() or int(user_ans) < 1 or int(user_ans) > 4:
-            printer.print_error("Invalid Input")
-
-        # send answer to server and get response
-        cmd, data = build_send_recv_parse(conn, chatlib.PROTOCOL_CLIENT["send_answer"],
-                                          chatlib.join_data([q_id, user_ans]))
-
-        # check if the answer is correct or not, and print the response
-        if cmd == chatlib.PROTOCOL_SERVER["correct_answer"]:
-            printer.print_ok("Correct")
-        elif cmd == chatlib.PROTOCOL_SERVER["wrong_answer"]:
-            printer.print_with_color(f"Wrong! the correct answer is: {data}", printer.PURPLE)
-        else:
-            error_and_exit("Error play question - get response on the answer")
+        get_answer(conn, q_id)
     # if the server send wrong response
     else:
         error_and_exit("Error play question - get wrong response")
 
+
+# TODO -implement functions: get_logged_users()
 
 def main():
     """
