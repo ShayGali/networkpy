@@ -18,10 +18,12 @@ PROTOCOL_CLIENT = {
     "get_score_msg": "MY_SCORE",
     "get_high_score_msg": "HIGHSCORE",
     "get_question": "GET_QUESTION",
-    "send_answer": "SEND_ANSWER"
+    "send_answer": "SEND_ANSWER",
+    "get_login_players": "LOGGED"
 }
 
 PROTOCOL_SERVER = {
+    "error_msg": "ERROR",
     "login_ok_msg": "LOGIN_OK",
     "login_failed_msg": "ERROR",
     "your_score_msg": "YOUR_SCORE",
@@ -30,6 +32,7 @@ PROTOCOL_SERVER = {
     "no_questions": "NO_QUESTIONS",
     "correct_answer": "CORRECT_ANSWER",
     "wrong_answer": "WRONG_ANSWER",
+    "get_login_players_msg": "LOGGED_ANSWER"
 }
 
 

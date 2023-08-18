@@ -47,6 +47,12 @@ def recv_message_and_parse(conn: socket.socket) -> Tuple[str, str]:
     printer.print_debug(f"[DEBUG]: got message: {res}")
 
     cmd, data = chatlib.parse_message(res)
+    if cmd is None:
+        error_and_exit("Error parsing message")
+
+    if cmd == chatlib.PROTOCOL_SERVER["error_msg"]:
+        error_and_exit(f"Error: {data}")
+
     return cmd, data
 
 
@@ -87,6 +93,7 @@ def login(conn: socket.socket) -> None:
         # username = input("Please enter username: ")
         # password = input("Please enter password: ")
         username = password = "test"
+
         # build data in the right format
         data = chatlib.join_data([username, password])
 
@@ -173,7 +180,6 @@ def play_question(conn: socket.socket) -> None:
     If the server send NO_QUESTIONS, the game is end.
     If error occurred, the program will close.
 
-    TODO: split the function to smaller functions
     :param conn:
     :return:
     """
@@ -207,7 +213,14 @@ def play_question(conn: socket.socket) -> None:
         error_and_exit("Error play question - get wrong response")
 
 
-# TODO -implement functions: get_logged_users()
+def get_logged_users(conn: socket.socket) -> None:
+    cmd, data = build_send_recv_parse(conn, chatlib.PROTOCOL_CLIENT["get_login_players"], "")
+
+    if cmd == chatlib.PROTOCOL_SERVER["get_login_players_msg"]:
+        print(f"Logged users: \n{data}")
+    else:
+        error_and_exit("Error getting high score")
+
 
 def main():
     """
@@ -222,6 +235,7 @@ def main():
                            "p\t Play a trivia question\n"
                            "s\t Get my score\n"
                            "h\t Get the high score\n"
+                           "l\t Get logged users\n"
                            "q\t Quit\n")
 
         if user_input == "p":
@@ -230,6 +244,8 @@ def main():
             get_score(conn)
         elif user_input == "h":
             get_high_score(conn)
+        elif user_input == "l":
+            get_logged_users(conn)
         elif user_input != "q":
             print("Invalid input")
 
