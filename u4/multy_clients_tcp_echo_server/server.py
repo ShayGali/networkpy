@@ -21,10 +21,10 @@ def main():
 
     print("Listening for clients...")
     client_sockets = []  # list of all the client sockets that are connected to the server
-
+    messages_to_send = []  # list of all the messages that need to be sent to the clients. each message is a tuple of (socket, message)
     while True:  # wait for clients, and handle them one by one
         # get sockets that are ready to be read from
-        ready_to_read, _, _ = select.select([server_socket] + client_sockets, [], [])
+        ready_to_read, ready_to_write, _ = select.select([server_socket] + client_sockets, client_sockets, [])
         # handle each socket that is ready to be read from
         for current_socket in ready_to_read:
             # if the socket is the server socket - there is a new client that wants to connect
@@ -35,8 +35,15 @@ def main():
                 print_client_sockets(client_sockets)
             # else, the socket is a client socket - a client sent a message
             else:
-                print(f"New data from client {current_socket.getpeername()}")
-                data = current_socket.recv(MAX_MSG_LENGTH).decode()
+                try:  # try to receive data from the client
+                    data = current_socket.recv(MAX_MSG_LENGTH).decode()
+                    print(f"New data from client {current_socket.getpeername()}")
+                except ConnectionResetError:  # if the client disconnected
+                    print(f"Client {current_socket.getpeername()} disconnected")
+                    client_sockets.remove(current_socket)
+                    current_socket.close()
+                    print_client_sockets(client_sockets)
+                    continue
                 if data == "":
                     print("Connection closed", )
                     client_sockets.remove(current_socket)
@@ -44,7 +51,14 @@ def main():
                     print_client_sockets(client_sockets)
                 else:
                     print(f"cliect send: {data}")
-                    current_socket.send(data.encode())
+                    messages_to_send.append((current_socket, data))
+
+        # handle each socket that is ready to be written to
+        for message in messages_to_send:
+            current_socket, data = message
+            if current_socket in ready_to_write:
+                current_socket.send(data.encode())
+                messages_to_send.remove(message)
 
 
 if __name__ == '__main__':
