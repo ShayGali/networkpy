@@ -1,3 +1,3 @@
-master|master|200|[]
-test|test|70|[]
-yossi|123|50|[]
+test|test|5|{2313, 4122}
+master|master|200|
+admin|admin|100|

@@ -45,3 +45,12 @@ def print_debug(msg: any = "") -> None:
     Returns: Nothing
     """
     print_with_color(msg, BLUE)
+
+
+def print_warning(msg: any = "") -> None:
+    """
+    Prints a warning message in orange.
+    Parameters: msg (str)
+    Returns: Nothing
+    """
+    print_with_color(msg, ORANGE)

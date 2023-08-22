@@ -1,5 +1,7 @@
+import signal
 import socket
 import random
+import sys
 from typing import Dict, Tuple, Union, List
 
 import select
@@ -223,7 +225,7 @@ def get_login_players(conn: socket.socket) -> None:
     build_and_send_message(conn, chatlib.PROTOCOL_SERVER["get_login_players_msg"], res)
 
 
-def create_random_question() -> str:
+def create_random_question(username: str) -> Union[str, None]:
     """
     Creates a random question from the questions' dictionary.
     The question will be in the format of the protocol.
@@ -231,28 +233,41 @@ def create_random_question() -> str:
     :return: Question
     """
     global questions
+    global users
 
-    random_question: Question = random.choice(list(questions.values()))
+    curr_user = users[username]
+    if len(curr_user.questions_asked) == len(questions):
+        return None
+
+    # get a random question that the user didn't answer yet
+    random_question = random.choice(
+        list(filter(lambda q: q.question_id not in curr_user.questions_asked, questions.values()))
+    )
     return random_question.format_to_send()
 
 
-def handle_get_question(conn: socket.socket) -> None:
+def handle_get_question(conn: socket.socket, username: str) -> None:
     """
     Gets a random question from the questions dictionary and send it to the client.
+    if the user answered all the questions, we send him a message that there are no more questions.
     :param conn:
+    :param username: the username of the client
     :return:
     """
     global questions
     global logged_users
 
-    random_question = create_random_question()
-    build_and_send_message(conn, chatlib.PROTOCOL_SERVER["get_question"], random_question)
+    random_question = create_random_question(username)
+    if random_question is None:
+        build_and_send_message(conn, chatlib.PROTOCOL_SERVER["no_questions"], "")
+    else:
+        build_and_send_message(conn, chatlib.PROTOCOL_SERVER["get_question"], random_question)
 
 
-def handle_send_answer(conn: socket.socket, data: str) -> None:
+def handle_send_answer(conn: socket.socket, data: str, username: str) -> None:
     """
     Gets the answer from the client and checks if it is correct.
-    If the answer is correct, the user will get 5 points.
+    If the answer is correct, the user will get 5 points, and we add the question id to the user's questions_asked set.
     :param conn:
     :param data:
     :return:
@@ -283,9 +298,15 @@ def handle_send_answer(conn: socket.socket, data: str) -> None:
         send_error(conn, "Error: choice must be between 1-4")
         return
 
+    # add the question id to the user's questions_asked set
+    curr_user = users[username]
+    curr_user.questions_asked.add(q_id)
+
     # check if the answer is correct, and send the response to the client
     if choice == q.correct:
-        users[logged_users[conn.getpeername()]].score += 5
+        # add 5 points to the user's score
+        curr_user.score += 5
+        # send the response to the client
         build_and_send_message(conn, chatlib.PROTOCOL_SERVER["correct_answer"], "")
     else:
         build_and_send_message(conn, chatlib.PROTOCOL_SERVER["wrong_answer"], str(q.correct))
@@ -327,9 +348,11 @@ def handle_client_message(conn, cmd, data):
     elif cmd == chatlib.PROTOCOL_CLIENT["get_login_players"]:
         get_login_players(conn)
     elif cmd == chatlib.PROTOCOL_CLIENT["get_question"]:
-        handle_get_question(conn)
+        username = logged_users[conn.getpeername()]
+        handle_get_question(conn, username)
     elif cmd == chatlib.PROTOCOL_CLIENT["send_answer"]:
-        handle_send_answer(conn, data)
+        username = logged_users[conn.getpeername()]
+        handle_send_answer(conn, data, username)
     else:
         send_error(conn, "Unknown command")
 
@@ -340,11 +363,9 @@ def save_data():
     :return:
     """
     global users
-    global questions
+
     for user in users.values():
-        db.save_user(user)
-    for question in questions.values():
-        db.save_question(question)
+        db.update_data(user)
 
 
 def main():
@@ -366,8 +387,7 @@ def main():
     # main loop
     while True:
         # get the sockets that are ready to read, write (error sockets are ignored for now)
-        ready_to_read, ready_to_write, _ = select.select([server_socket] + client_sockets, client_sockets, [])
-
+        ready_to_read, ready_to_write, _ = select.select([server_socket] + client_sockets, client_sockets, [], 1)
         # handle all the messages that need to be read
         for current_socket in ready_to_read:
             if current_socket is server_socket:  # if the socket is the server socket, we need to accept the new client
@@ -398,9 +418,13 @@ def main():
                     messages_to_send.remove(message_to_send)
 
 
+def handle_interrupt(signum, frame):
+    printer.print_warning("\n[DEBUG]: Program interrupted by user.")
+    save_data()
+    printer.print_ok("[DEBUG]: Cleanup and data save completed.")
+    sys.exit(0)
+
+
 if __name__ == '__main__':
-    try:
-        main()
-    except Exception as e:  # if an error occurred, we need to save the data before we exit
-        save_data()
-        raise e
+    signal.signal(signal.SIGINT, handle_interrupt)
+    main()

@@ -105,7 +105,3 @@ def save_question(question: Question) -> bool:
     with open(path_to_db_folder + "/questions.txt", "a+") as f:
         f.write(question.format_for_save() + "\n")
         return True
-
-
-save_question(Question(2313, "How much is 2+2", ["3", "4", "2", "1"], 2),)
-save_question(Question(4122, "What is the capital of France?", ["Lion", "Marseille", "Paris", "Montpelier"], 3),)
