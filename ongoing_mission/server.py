@@ -8,6 +8,7 @@ from lib.objects import User, Question
 
 import lib.chatlib as chatlib
 import lib.printer as printer
+import lib.db_handler as db
 
 # GLOBALS
 """
@@ -107,31 +108,20 @@ def build_send_recv_parse(conn: socket.socket, code: str, data: str) -> Tuple[st
 
 def load_questions() -> Dict[int, Question]:
     """
-    Loads questions bank from file	## FILE SUPPORT TO BE ADDED LATER
+    Loads questions bank from file
     Receives: -
     Returns: questions dictionary
     """
-    questions_from_db = {
-        2313: Question(2313, "How much is 2+2", ["3", "4", "2", "1"], 2),
-        4122: Question(4122, "What is the capital of France?", ["Lion", "Marseille", "Paris", "Montpelier"], 3),
-
-    }
-
-    return questions_from_db
+    return db.get_all_questions()
 
 
 def load_user_database() -> Dict[str, User]:
     """
-    Loads users list from file	## FILE SUPPORT TO BE ADDED LATER
+    Loads users list from file
     Receives: -
-    Returns: user set
+    Returns: user dictionary
     """
-    users_from_db = {
-        "test": User(1, "test", "test", 70),
-        "yossi": User(2, "yossi", "123", 50),
-        "master": User(3, "master", "master", 200),
-    }
-    return users_from_db
+    return db.get_all_users()
 
 
 # SOCKET CREATOR
@@ -344,6 +334,19 @@ def handle_client_message(conn, cmd, data):
         send_error(conn, "Unknown command")
 
 
+def save_data():
+    """
+    Saves the users and questions to the database.
+    :return:
+    """
+    global users
+    global questions
+    for user in users.values():
+        db.save_user(user)
+    for question in questions.values():
+        db.save_question(question)
+
+
 def main():
     # Initializes global users and questions dictionaries using load functions, will be used later
     global users
@@ -396,4 +399,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:  # if an error occurred, we need to save the data before we exit
+        save_data()
+        raise e
