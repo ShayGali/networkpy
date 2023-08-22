@@ -1,9 +1,9 @@
-##############################################################################
-# server.py
-##############################################################################
-
 import socket
-from typing import Set, Dict, Tuple
+import bisect
+from typing import Dict, Tuple, Union, List
+
+import select
+
 from lib.objects import User, Question
 
 import lib.chatlib as chatlib
@@ -15,9 +15,14 @@ The users set and the questions dict are used to store the data of the server.
 in the future, this data will be loaded from files, but for now, it is hardcoded.
 """
 users: Dict[str, User] = {}  # a dist of all users (User objects), the key is the username
-# a dict of questions, each question is a dict with the following fields: question, answers list, correct answer index (0-3). each key is a unique number, that represents a question
+
 questions: Dict[int, Question] = {}  # a dist of all the questions (Question objects), the key is the question id
-logged_users: Dict[str, User] = {}  # a dict of all the logged-in users (User objects), the key is the username
+
+# a dict of all the logged-in users (User objects), the key is the connection info (IP, port)
+logged_users: Dict[Tuple[str, str], str] = {}
+
+# a list of all the client sockets
+client_sockets: List[socket.socket] = []
 
 # CONSTANTS
 ERROR_MSG = "Error! "
@@ -48,16 +53,19 @@ def build_and_send_message(conn: socket.socket, code: str, data: str) -> None:
     conn.send(req.encode())
 
 
-def recv_message_and_parse(conn: socket.socket) -> Tuple[str, str]:
+def recv_message_and_parse(conn: socket.socket) -> Union[Tuple[str, str], Tuple[None, None]]:
     """
     Receives a new message from given socket,
     then parses the message using chatlib.
     Parameters: conn (socket object)
     Returns: cmd (str) and data (str) of the received message.
-    If error occurred, will exit the program.
+    If error occurred, will return None, None
     """
     res = conn.recv(1024).decode()
     printer.print_debug(f"[DEBUG-CLIENT]: got message: {res}")
+
+    if res == "":
+        return None, None
 
     cmd, data = chatlib.parse_message(res)
     if cmd is None:
@@ -107,9 +115,9 @@ def load_user_database() -> Dict[str, User]:
     Returns: user set
     """
     users_from_db = {
-        "test", User(1, "test", "test"),
-        "yossi", User(2, "yossi", "123", 50),
-        "master", User(3, "master", "master", 200),
+        "test": User(1, "test", "test", 70),
+        "yossi": User(2, "yossi", "123", 50),
+        "master": User(3, "master", "master", 200),
     }
     return users_from_db
 
@@ -131,24 +139,7 @@ def setup_socket() -> socket.socket:
     return sock
 
 
-##### MESSAGE HANDLING
-
-
-def handle_get_score_message(conn, username):
-    global users
-
-
-def handle_logout_message(conn):
-    """
-    Closes the given socket (in later chapters, also remove user from logged_users dictionary)
-    Receives: socket
-    Returns: None
-    """
-    global logged_users
-
-
-# Implement code ...
-
+# ~~~ MESSAGE HANDLING ~~~ #
 
 def handle_login_message(conn: socket.socket, data: str) -> None:
     """
@@ -158,8 +149,7 @@ def handle_login_message(conn: socket.socket, data: str) -> None:
     Returns: None (sends answer to client)
     """
     global users  # This is needed to access the same users dictionary from all functions
-    global logged_users  # To be used later
-
+    global logged_users  # To check if the user is already logged in, and to add him to the logged users dict
     username_password = chatlib.split_data(data, 2)  # Splitting the data to username and password
 
     # Check if the data parsed correctly
@@ -173,40 +163,154 @@ def handle_login_message(conn: socket.socket, data: str) -> None:
 
     # check if the user exists, and if he does, check if the password is correct
     if username not in users or users[username].password != password:
-        send_error(conn, "Wrong credentials")
+        build_and_send_message(conn, chatlib.PROTOCOL_SERVER["login_failed_msg"], "Wrong credentials")
         return
 
     # check if the user is already logged in
-    if username in logged_users:
-        send_error(conn, "User already logged in")
+    if username in logged_users.values():
+        build_and_send_message(conn, chatlib.PROTOCOL_SERVER["login_failed_msg"], "User already logged in")
         return
 
-    logged_users[username] = users[username]  # add user to logged users
+    logged_users[conn.getpeername()] = username  # add user to logged users dict
     build_and_send_message(conn, chatlib.PROTOCOL_SERVER["login_ok_msg"], "")  # send OK to client
+
+
+def handle_logout_message(conn: socket.socket) -> None:
+    """
+    Closes the given socket. removes user from logged_users, and removes the socket from client_sockets
+    Receives: socket
+    Returns: None
+    """
+    # TODO: remove user from logged_users
+    global logged_users
+    global client_sockets
+
+    conn.close()
+    del logged_users[conn.getpeername()]
+    client_sockets.remove(conn)
+
+
+def handle_get_score_message(conn: socket.socket, username: str) -> None:
+    """
+    Gets username and send the score to the client.
+    :param conn:
+    :param username:
+    :return:
+    """
+    global users
+
+    current_user = users[username]
+    score = current_user.score
+    build_and_send_message(conn, chatlib.PROTOCOL_SERVER["get_score_msg"], str(score))
+
+
+def handle_highscore_message(conn: socket.socket) -> None:
+    global users
+    sorted_by_score = sorted(users.values(), key=lambda u: u.score, reverse=True)
+    res = "\n".join(map(lambda user: f"{user.username}: {user.score}", sorted_by_score))
+    build_and_send_message(conn, chatlib.PROTOCOL_SERVER["get_high_score_msg"], res)
+
+
+def get_login_players(conn: socket.socket) -> None:
+    """
+    Gets the logged in players and send them to the client.
+    :param conn:
+    :return:
+    """
+    global logged_users
+    res = ", ".join(logged_users.values())
+    build_and_send_message(conn, chatlib.PROTOCOL_SERVER["get_login_players_msg"], res)
 
 
 def handle_client_message(conn, cmd, data):
     """
-    Gets message code and data and calls the right function to handle command
+    Gets message code and data and calls the right function to handle command.
+    if the user is not logged in, the only commands he can use are login.
+    if the user is logged in, he can use all the commands, except login.
+
     Receives: socket, message code and data
     Returns: None
     """
     global logged_users  # To be used later
 
+    if cmd is None:
+        send_error(conn, "Error on parsing your message")
+        return
 
-# Implement code ...
+    # if the command is login, we check if the user is already logged in
+    if cmd == chatlib.PROTOCOL_CLIENT["login_msg"]:
+        if conn.getpeername() in logged_users:
+            send_error(conn, "You are already logged in!")
+            return
+    else:  # if the command is not login, we check if the user is logged in
+        if conn.getpeername() not in logged_users:
+            send_error(conn, "You are not logged in!")
+            return
+
+    if cmd == chatlib.PROTOCOL_CLIENT["login_msg"]:
+        handle_login_message(conn, data)
+    elif cmd == chatlib.PROTOCOL_CLIENT["logout_msg"]:
+        handle_logout_message(conn)
+    elif cmd == chatlib.PROTOCOL_CLIENT["get_score_msg"]:
+        handle_get_score_message(conn, logged_users[conn.getpeername()])
+    elif cmd == chatlib.PROTOCOL_CLIENT["get_high_score_msg"]:
+        handle_highscore_message(conn)
+    elif cmd == chatlib.PROTOCOL_CLIENT["get_login_players"]:
+        get_login_players(conn)
+    else:
+        send_error(conn, "Unknown command")
 
 
 def main():
     # Initializes global users and questions dictionaries using load functions, will be used later
     global users
     global questions
+    global client_sockets
+    users = load_user_database()
+    questions = load_questions()
 
     print("Welcome to Trivia Server!")
+    server_socket = setup_socket()
+
+    while True:
+        ready_to_read, ready_to_write, _ = select.select([server_socket] + client_sockets, client_sockets, [])
+        for current_socket in ready_to_read:
+            if current_socket is server_socket:
+                (client_socket, client_address) = current_socket.accept()
+                printer.print_debug(f"[DEBUG]: New client joined! {client_address}")
+                client_sockets.append(client_socket)
+            else:
+                try:
+                    cmd, data = recv_message_and_parse(current_socket)
+                except ConnectionResetError:
+                    printer.print_debug(f"[DEBUG]: Client {current_socket.getpeername()} disconnected")
+                    client_sockets.remove(current_socket)
+                    current_socket.close()
+                    continue
+
+                if data is None:
+                    printer.print_debug(f"[DEBUG]: Connection {current_socket.getpeername()} closed!")
+                    client_sockets.remove(current_socket)
+                    current_socket.close()
+                else:
+                    printer.print_debug(f"[DEBUG]: client  {current_socket.getpeername()}, send: {data}")
+                    handle_client_message(current_socket, cmd, data)
 
 
-# Implement code ...
+def for_testing():
+    global users
+    global questions
+    users = load_user_database()
+    questions = load_questions()
+
+    temp_list = []
+    for user in users.values():
+        bisect.insort(temp_list, (user.score, user.username))
+        # temp_list.insert(bisect.bisect_left(temp_list, (user.score, user.username)), (user.score, user.username))
+
+    print(temp_list)
 
 
 if __name__ == '__main__':
     main()
+    # for_testing()

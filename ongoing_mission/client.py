@@ -1,9 +1,7 @@
 import socket
-import sys
-
 from typing import Tuple
 
-import lib.chatlib as chatlib  # To use chatlib functions or consts, use chatlib.****
+import lib.chatlib as chatlib
 import lib.printer as printer
 
 SERVER_IP = "127.0.0.1"  # Our server will run on same computer as client
@@ -76,7 +74,7 @@ def error_and_exit(error_msg: str) -> None:
     :param error_msg: error message to print
     :return: None
     """
-    print(error_msg, file=sys.stderr)
+    printer.print_error(error_msg)
     exit()
 
 
@@ -90,9 +88,9 @@ def login(conn: socket.socket) -> None:
     """
     while True:
         # get user and password from user
-        # username = input("Please enter username: ")
-        # password = input("Please enter password: ")
-        username = password = "test"
+        username = input("Please enter username: ")
+        password = input("Please enter password: ")
+        # username = password = "test"
 
         # build data in the right format
         data = chatlib.join_data([username, password])
@@ -105,7 +103,7 @@ def login(conn: socket.socket) -> None:
             print("Login successful")
             return
         elif cmd == chatlib.PROTOCOL_SERVER["login_failed_msg"]:
-            print("Login failed")
+            print(f"Login failed, the server send: {data}")
         else:
             error_and_exit("Login failed due to unexpected response from server")
 
@@ -126,7 +124,7 @@ def get_score(conn: socket.socket) -> None:
     :return: None
     """
     cmd, data = build_send_recv_parse(conn, chatlib.PROTOCOL_CLIENT["get_score_msg"], "")
-    if cmd == chatlib.PROTOCOL_SERVER["your_score_msg"]:
+    if cmd == chatlib.PROTOCOL_SERVER["get_score_msg"]:
         print(f"Your score is: {data}")
     else:
         error_and_exit("Error getting score")
