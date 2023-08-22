@@ -1,5 +1,5 @@
 import socket
-import bisect
+import random
 from typing import Dict, Tuple, Union, List
 
 import select
@@ -24,8 +24,10 @@ logged_users: Dict[Tuple[str, str], str] = {}
 # a list of all the client sockets
 client_sockets: List[socket.socket] = []
 
+# a list of all the messages that need to be sent to the clients - (client socket, message)
+messages_to_send: List[Tuple[Tuple[str, str], str]] = []
+
 # CONSTANTS
-ERROR_MSG = "Error! "
 SERVER_PORT = 5678
 SERVER_IP = "127.0.0.1"
 
@@ -43,14 +45,19 @@ def send_error(conn: socket.socket, error_msg: str) -> None:
 
 def build_and_send_message(conn: socket.socket, code: str, data: str) -> None:
     """
-    Builds a new message using chatlib, wanted code and message.
+    Builds a new message using chatlib. the message will be in the format of the protocol.
+    the message for sending will append to the messages_to_send list,
+    and will be sent when the socket is ready to write.
     Prints [DEBUG] info, then sends it to the given socket.
     Parameters: conn (socket object), code (str), data (str)
     Returns: None
     """
+    global messages_to_send
     req = chatlib.build_message(code, data)
     printer.print_debug(f"[DEBUG-SERVER]: sending message: {req}")
-    conn.send(req.encode())
+
+    # append the message to the messages_to_send list
+    messages_to_send.append((conn.getpeername(), req))
 
 
 def recv_message_and_parse(conn: socket.socket) -> Union[Tuple[str, str], Tuple[None, None]]:
@@ -61,13 +68,18 @@ def recv_message_and_parse(conn: socket.socket) -> Union[Tuple[str, str], Tuple[
     Returns: cmd (str) and data (str) of the received message.
     If error occurred, will return None, None
     """
+    # get the message from the socket
     res = conn.recv(1024).decode()
     printer.print_debug(f"[DEBUG-CLIENT]: got message: {res}")
 
+    # check if the message is empty
     if res == "":
         return None, None
 
+    # parse the message
     cmd, data = chatlib.parse_message(res)
+
+    # check if the message parsed correctly
     if cmd is None:
         send_error(conn, "Error on parsing your message")
 
@@ -184,9 +196,9 @@ def handle_logout_message(conn: socket.socket) -> None:
     global logged_users
     global client_sockets
 
-    conn.close()
     del logged_users[conn.getpeername()]
     client_sockets.remove(conn)
+    conn.close()
 
 
 def handle_get_score_message(conn: socket.socket, username: str) -> None:
@@ -219,6 +231,74 @@ def get_login_players(conn: socket.socket) -> None:
     global logged_users
     res = ", ".join(logged_users.values())
     build_and_send_message(conn, chatlib.PROTOCOL_SERVER["get_login_players_msg"], res)
+
+
+def create_random_question() -> str:
+    """
+    Creates a random question from the questions' dictionary.
+    The question will be in the format of the protocol.
+    the format is: question_id#question#answer1#answer2#answer3#answer4#correct_answer
+    :return: Question
+    """
+    global questions
+
+    random_question: Question = random.choice(list(questions.values()))
+    return random_question.format_to_send()
+
+
+def handle_get_question(conn: socket.socket) -> None:
+    """
+    Gets a random question from the questions dictionary and send it to the client.
+    :param conn:
+    :return:
+    """
+    global questions
+    global logged_users
+
+    random_question = create_random_question()
+    build_and_send_message(conn, chatlib.PROTOCOL_SERVER["get_question"], random_question)
+
+
+def handle_send_answer(conn: socket.socket, data: str) -> None:
+    """
+    Gets the answer from the client and checks if it is correct.
+    If the answer is correct, the user will get 5 points.
+    :param conn:
+    :param data:
+    :return:
+    """
+    global questions
+    global logged_users
+    global users
+
+    # check if the data parsed correctly
+    id_choice = chatlib.split_data(data, 2)
+    if id_choice is None:
+        send_error(conn, "Error on parsing your answer")
+        return
+    if not (id_choice[0].isdigit() and id_choice[1].isdigit()):
+        send_error(conn, "Error: if and choice must be numbers")
+        return
+
+    # get question id and choice, and if its valid
+    q_id = int(id_choice[0])
+    if q_id not in questions:
+        send_error(conn, "Error: question id not exists")
+        return
+
+    choice = int(id_choice[1])
+    q = questions[q_id]
+
+    if choice < 1 or choice > 4:
+        send_error(conn, "Error: choice must be between 1-4")
+        return
+
+    # check if the answer is correct, and send the response to the client
+    if choice == q.correct:
+        users[logged_users[conn.getpeername()]].score += 5
+        build_and_send_message(conn, chatlib.PROTOCOL_SERVER["correct_answer"], "")
+    else:
+        build_and_send_message(conn, chatlib.PROTOCOL_SERVER["wrong_answer"], str(q.correct))
 
 
 def handle_client_message(conn, cmd, data):
@@ -256,6 +336,10 @@ def handle_client_message(conn, cmd, data):
         handle_highscore_message(conn)
     elif cmd == chatlib.PROTOCOL_CLIENT["get_login_players"]:
         get_login_players(conn)
+    elif cmd == chatlib.PROTOCOL_CLIENT["get_question"]:
+        handle_get_question(conn)
+    elif cmd == chatlib.PROTOCOL_CLIENT["send_answer"]:
+        handle_send_answer(conn, data)
     else:
         send_error(conn, "Unknown command")
 
@@ -265,51 +349,51 @@ def main():
     global users
     global questions
     global client_sockets
+    global messages_to_send
+
+    # load the users and questions from the database
     users = load_user_database()
     questions = load_questions()
 
     print("Welcome to Trivia Server!")
+
+    # set up the socket
     server_socket = setup_socket()
 
+    # main loop
     while True:
+        # get the sockets that are ready to read, write (error sockets are ignored for now)
         ready_to_read, ready_to_write, _ = select.select([server_socket] + client_sockets, client_sockets, [])
+
+        # handle all the messages that need to be read
         for current_socket in ready_to_read:
-            if current_socket is server_socket:
+            if current_socket is server_socket:  # if the socket is the server socket, we need to accept the new client
                 (client_socket, client_address) = current_socket.accept()
                 printer.print_debug(f"[DEBUG]: New client joined! {client_address}")
                 client_sockets.append(client_socket)
-            else:
-                try:
+            else:  # if the socket is a client socket, we need to read the message
+                try:  # try to read the message
                     cmd, data = recv_message_and_parse(current_socket)
-                except ConnectionResetError:
+                except ConnectionResetError:  # if the client disconnected, we need to handle it
                     printer.print_debug(f"[DEBUG]: Client {current_socket.getpeername()} disconnected")
-                    client_sockets.remove(current_socket)
-                    current_socket.close()
+                    handle_logout_message(current_socket)
                     continue
 
+                # if the client send an empty message, we need to handle it
                 if data is None:
                     printer.print_debug(f"[DEBUG]: Connection {current_socket.getpeername()} closed!")
-                    client_sockets.remove(current_socket)
-                    current_socket.close()
-                else:
+                    handle_logout_message(current_socket)
+                else:  # if the client send a valid message, we need to handle it
                     printer.print_debug(f"[DEBUG]: client  {current_socket.getpeername()}, send: {data}")
                     handle_client_message(current_socket, cmd, data)
 
-
-def for_testing():
-    global users
-    global questions
-    users = load_user_database()
-    questions = load_questions()
-
-    temp_list = []
-    for user in users.values():
-        bisect.insort(temp_list, (user.score, user.username))
-        # temp_list.insert(bisect.bisect_left(temp_list, (user.score, user.username)), (user.score, user.username))
-
-    print(temp_list)
+        # send all the messages that need to be sent
+        for socket_to_write in ready_to_write:
+            for message_to_send in messages_to_send:
+                if message_to_send[0] == socket_to_write.getpeername():
+                    socket_to_write.send(message_to_send[1].encode())
+                    messages_to_send.remove(message_to_send)
 
 
 if __name__ == '__main__':
     main()
-    # for_testing()

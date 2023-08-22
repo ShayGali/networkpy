@@ -15,24 +15,24 @@ DATA_DELIMITER = "#"  # Delimiter in the data part of the message
 PROTOCOL_CLIENT = {
     "login_msg": "LOGIN",
     "logout_msg": "LOGOUT",
-    "get_score_msg": "MY_SCORE",
-    "get_high_score_msg": "HIGHSCORE",
+    "get_login_players": "LOGGED",
     "get_question": "GET_QUESTION",
     "send_answer": "SEND_ANSWER",
-    "get_login_players": "LOGGED"
+    "get_score_msg": "MY_SCORE",
+    "get_high_score_msg": "HIGHSCORE",
 }
 
 PROTOCOL_SERVER = {
     "error_msg": "ERROR",
     "login_ok_msg": "LOGIN_OK",
     "login_failed_msg": "LOGIN_FAILED",
-    "get_score_msg": "YOUR_SCORE",
-    "get_high_score_msg": "ALL_SCORE",
+    "get_login_players_msg": "LOGGED_ANSWER",
     "get_question": "YOUR_QUESTION",
-    "no_questions": "NO_QUESTIONS",
     "correct_answer": "CORRECT_ANSWER",
     "wrong_answer": "WRONG_ANSWER",
-    "get_login_players_msg": "LOGGED_ANSWER"
+    "get_score_msg": "YOUR_SCORE",
+    "get_high_score_msg": "ALL_SCORE",
+    "no_questions": "NO_QUESTIONS",
 }
 
 
@@ -101,7 +101,6 @@ def split_data(msg: str, expected_fields: int) -> Union[List[str], None]:
         return None
 
     return msg.split(DATA_DELIMITER)
-    # return msg.split(DATA_DELIMITER) if msg.count(DATA_DELIMITER) == expected_fields - 1 else None
 
 
 def join_data(msg_fields: List[str]) -> str:
