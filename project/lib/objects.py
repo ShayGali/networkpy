@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import List, Set
 import ast
 
-from lib.chatlib import DATA_DELIMITER
+from project.lib.chatlib import DATA_DELIMITER
 
 
 @dataclass

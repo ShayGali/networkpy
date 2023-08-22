@@ -1,8 +1,8 @@
 from typing import Dict, List
 
-from lib.objects import User, Question
+from project.lib.objects import User, Question
 
-path_to_db_folder = "../ongoing_mission/db"
+path_to_db_folder = "./db"
 
 
 # ~~ Users ~~ #

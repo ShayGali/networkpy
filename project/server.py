@@ -6,11 +6,11 @@ from typing import Dict, Tuple, Union, List
 
 import select
 
-from lib.objects import User, Question
+from project.lib.objects import User, Question
 
-import lib.chatlib as chatlib
-import lib.printer as printer
-import lib.db_handler as db
+import project.lib.chatlib as chatlib
+import project.lib.printer as printer
+import project.lib.db_handler as db
 
 # GLOBALS
 """
@@ -419,6 +419,9 @@ def main():
 
 
 def handle_interrupt(signum, frame):
+    """
+    Handles the interrupt signal (ctrl+c).
+    """
     printer.print_warning("\n[DEBUG]: Program interrupted by user.")
     save_data()
     printer.print_ok("[DEBUG]: Cleanup and data save completed.")
@@ -426,5 +429,7 @@ def handle_interrupt(signum, frame):
 
 
 if __name__ == '__main__':
+    # handle ctrl+c
     signal.signal(signal.SIGINT, handle_interrupt)
+
     main()

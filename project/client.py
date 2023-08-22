@@ -1,8 +1,8 @@
 import socket
 from typing import Tuple
 
-import lib.chatlib as chatlib
-import lib.printer as printer
+import project.lib.chatlib as chatlib
+import project.lib.printer as printer
 
 SERVER_IP = "127.0.0.1"  # Our server will run on same computer as client
 SERVER_PORT = 5678
