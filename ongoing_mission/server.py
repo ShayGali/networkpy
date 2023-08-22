@@ -181,7 +181,6 @@ def handle_logout_message(conn: socket.socket) -> None:
     Receives: socket
     Returns: None
     """
-    # TODO: remove user from logged_users
     global logged_users
     global client_sockets
 
