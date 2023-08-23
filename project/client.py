@@ -7,6 +7,8 @@ import project.lib.printer as printer
 SERVER_IP = "127.0.0.1"  # Our server will run on same computer as client
 SERVER_PORT = 5678
 
+DEBUGGING_MODE = True  # Print all debug messages to stdout while True
+
 
 # HELPER SOCKET METHODS
 
@@ -24,12 +26,14 @@ def connect() -> socket.socket:
 def build_and_send_message(conn: socket.socket, code: str, data: str) -> None:
     """
     Builds a new message using chatlib, wanted code and message.
-    Prints [DEBUG] info, then sends it to the given socket.
+    In debug mode prints [DEBUG] info, then sends it to the given socket.
     Parameters: conn (socket object), code (str), data (str)
     Returns: None
     """
     req = chatlib.build_message(code, data)
-    printer.print_debug(f"[DEBUG]: sending message: {req}")
+
+    if DEBUGGING_MODE:
+        printer.print_debug(f"[DEBUG]: sending message: {req}")
     conn.send(req.encode())
 
 
@@ -37,12 +41,14 @@ def recv_message_and_parse(conn: socket.socket) -> Tuple[str, str]:
     """
     Receives a new message from given socket,
     then parses the message using chatlib.
+    In debug mode prints [DEBUG] info.
     Parameters: conn (socket object)
     Returns: cmd (str) and data (str) of the received message.
     If error occurred, will exit the program.
     """
     res = conn.recv(1024).decode()
-    printer.print_debug(f"[DEBUG]: got message: {res}")
+    if DEBUGGING_MODE:
+        printer.print_debug(f"[DEBUG]: got message: {res}")
 
     cmd, data = chatlib.parse_message(res)
     if cmd is None:
@@ -57,7 +63,7 @@ def recv_message_and_parse(conn: socket.socket) -> Tuple[str, str]:
 def build_send_recv_parse(conn: socket.socket, code: str, data: str) -> Tuple[str, str]:
     """
     Builds a new message using chatlib, wanted code and message.
-    Prints [DEBUG] info, then sends it to the given socket.
+    if debug mode is on, prints [DEBUG] info, then sends it to the given socket.
     Then, receives a new message from given socket,
     then parses the message using chatlib.
     Parameters: conn (socket object), code (str), data (str)
@@ -254,7 +260,9 @@ def main():
 
     logout(conn)
     conn.close()
-    printer.print_debug("[DEBUG]: connection closed")
+    if DEBUGGING_MODE:
+        printer.print_debug("[DEBUG]: connection closed")
+    print("Thank you for playing, Goodbye!")
 
 
 if __name__ == '__main__':
