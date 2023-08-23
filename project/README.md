@@ -19,7 +19,7 @@ pulled from an API.
 
 ## Screenshots
 
-##### Login
+#### Login
 ![Login](screenshots/login.png)
 
 #### Menu
