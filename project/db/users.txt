@@ -1,3 +1,4 @@
 test|test|5|{2313, 4122}
 master|master|200|
 admin|admin|100|
+attacker|123456|0|
