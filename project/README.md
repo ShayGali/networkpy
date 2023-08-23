@@ -1,4 +1,4 @@
-# Trivia Game with Network Programming
+# Trivia Game
 
 ## Description
 
