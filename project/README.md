@@ -1,7 +1,5 @@
 # Trivia Game with Network Programming
 
-![Screenshot](link_to_screenshot_here)
-
 ## Description
 
 Welcome to the Trivia Game Project! This project showcases the application of network programming concepts to create a
