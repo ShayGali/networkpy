@@ -188,7 +188,8 @@ def handle_logout_message(conn: socket.socket) -> None:
     global logged_users
     global client_sockets
 
-    del logged_users[conn.getpeername()]
+    if conn.getpeername() in logged_users:
+        del logged_users[conn.getpeername()]
     client_sockets.remove(conn)
     conn.close()
 
@@ -268,6 +269,7 @@ def handle_send_answer(conn: socket.socket, data: str, username: str) -> None:
     """
     Gets the answer from the client and checks if it is correct.
     If the answer is correct, the user will get 5 points, and we add the question id to the user's questions_asked set.
+    :param username:
     :param conn:
     :param data:
     :return:
@@ -300,6 +302,12 @@ def handle_send_answer(conn: socket.socket, data: str, username: str) -> None:
 
     # add the question id to the user's questions_asked set
     curr_user = users[username]
+
+    # check if the user already answered the question
+    if q_id in curr_user.questions_asked:
+        send_error(conn, "Error: question already answered")
+        return
+
     curr_user.questions_asked.add(q_id)
 
     # check if the answer is correct, and send the response to the client
@@ -423,7 +431,7 @@ def handle_interrupt(signum, frame):
     Handles the interrupt signal (ctrl+c).
     """
     printer.print_warning("\n[DEBUG]: Program interrupted by user.")
-    save_data()
+    # save_data()
     printer.print_ok("[DEBUG]: Cleanup and data save completed.")
     sys.exit(0)
 
