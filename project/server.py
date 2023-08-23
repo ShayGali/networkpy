@@ -3,7 +3,8 @@ import socket
 import random
 import sys
 from typing import Dict, Tuple, Union, List
-
+import requests
+import html
 import select
 
 from project.lib.objects import User, Question
@@ -114,7 +115,8 @@ def load_questions() -> Dict[int, Question]:
     Receives: -
     Returns: questions dictionary
     """
-    return db.get_all_questions()
+    return load_questions_from_web()
+    # return db.get_all_questions()
 
 
 def load_user_database() -> Dict[str, User]:
@@ -224,6 +226,46 @@ def get_login_players(conn: socket.socket) -> None:
     global logged_users
     res = ", ".join(logged_users.values())
     build_and_send_message(conn, chatlib.PROTOCOL_SERVER["get_login_players_msg"], res)
+
+
+# ~~~ Questions ~~~ #
+def load_questions_from_web() -> Dict[int, Question]:
+    """
+    Loads questions bank from web
+    Receives: -
+    Returns: questions dictionary
+    """
+    num_of_questions = 50
+
+    req = requests.get(
+        f"https://opentdb.com/api.php?amount={num_of_questions}&category=18&type=multiple"
+    )
+    if req.status_code != 200:
+        return {}
+
+    req_as_json = req.json()
+
+    if req_as_json["response_code"] != 0:
+        printer.print_error("Error on getting questions from web, the server send: " + req.text)
+        return {}
+
+    questions_from_web = req_as_json["results"]
+    q_id_gen = 1000
+    res = {}
+    for q in questions_from_web:
+        insert_correct_position = random.randint(0, 3)
+        q["incorrect_answers"].insert(insert_correct_position, q["correct_answer"])
+
+        question = Question(
+            q_id_gen,
+            html.unescape(q["question"]),
+            list(map(lambda a: html.unescape(a), q["incorrect_answers"])),
+            insert_correct_position + 1  # we send the correct answer as a number between 1-4
+        )
+        res[q_id_gen] = question
+        q_id_gen += 1
+
+    return res
 
 
 def create_random_question(username: str) -> Union[str, None]:
@@ -373,6 +415,8 @@ def save_data():
     global users
 
     for user in users.values():
+        # we don't want to save the questions_asked set, because it will be loaded from the web
+        user.questions_asked = set()
         db.update_data(user)
 
 
@@ -386,7 +430,6 @@ def main():
     # load the users and questions from the database
     users = load_user_database()
     questions = load_questions()
-
     print("Welcome to Trivia Server!")
 
     # set up the socket
@@ -431,7 +474,7 @@ def handle_interrupt(signum, frame):
     Handles the interrupt signal (ctrl+c).
     """
     printer.print_warning("\n[DEBUG]: Program interrupted by user.")
-    # save_data()
+    save_data()
     printer.print_ok("[DEBUG]: Cleanup and data save completed.")
     sys.exit(0)
 
