@@ -7,7 +7,7 @@ import project.lib.printer as printer
 SERVER_IP = "127.0.0.1"  # Our server will run on same computer as client
 SERVER_PORT = 5678
 
-DEBUGGING_MODE = True  # Print all debug messages to stdout while True
+DEBUGGING_MODE = False  # Print all debug messages to stdout while True
 
 
 # HELPER SOCKET METHODS
@@ -19,7 +19,8 @@ def connect() -> socket.socket:
     """
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.connect((SERVER_IP, SERVER_PORT))
-    printer.print_debug("[DEBUG]: connected to server")
+    if DEBUGGING_MODE:
+        printer.print_debug("[DEBUG]: connected to server")
     return server_socket
 
 

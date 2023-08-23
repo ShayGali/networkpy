@@ -1,4 +1,4 @@
-test|test|20|
+test|test|25|
 master|master|200|
 admin|admin|100|
 attacker|123456|0|

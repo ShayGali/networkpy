@@ -7,11 +7,11 @@ import requests
 import html
 import select
 
-from project.lib.objects import User, Question
+import lib.chatlib as chatlib
+from lib.objects import User, Question
 
-import project.lib.chatlib as chatlib
-import project.lib.printer as printer
-import project.lib.db_handler as db
+import lib.printer as printer
+import lib.db_handler as db
 
 # GLOBALS
 """
@@ -57,6 +57,7 @@ def build_and_send_message(conn: socket.socket, code: str, data: str) -> None:
     Returns: None
     """
     global messages_to_send
+
     req = chatlib.build_message(code, data)
     printer.print_debug(f"[DEBUG-SERVER]: sending message: {req}")
 
@@ -253,6 +254,8 @@ def load_questions_from_web() -> Dict[int, Question]:
     q_id_gen = 1000
     res = {}
     for q in questions_from_web:
+        if chatlib.DATA_DELIMITER in q["question"]:
+            continue
         insert_correct_position = random.randint(0, 3)
         q["incorrect_answers"].insert(insert_correct_position, q["correct_answer"])
 
